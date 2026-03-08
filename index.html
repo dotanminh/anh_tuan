@@ -1,0 +1,1245 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kiến Trúc Trợ Lý AI — Python Parse Excel/Word</title>
+    <meta name="description" content="Tài liệu kiến trúc tổng thể cho trợ lý AI xử lý báo cáo Excel/Word, lên lịch & nhắc nhở, cảnh báo KPI.">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+    <style>
+        :root {
+            --bg-primary: #0a0e1a;
+            --bg-secondary: #111827;
+            --bg-card: #1a2234;
+            --bg-card-hover: #1f2a40;
+            --border: #2a3654;
+            --border-glow: #3b82f6;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --accent-blue: #3b82f6;
+            --accent-purple: #8b5cf6;
+            --accent-cyan: #06b6d4;
+            --accent-green: #10b981;
+            --accent-orange: #f59e0b;
+            --accent-red: #ef4444;
+            --accent-pink: #ec4899;
+            --gradient-1: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            --gradient-2: linear-gradient(135deg, #06b6d4, #10b981);
+            --gradient-3: linear-gradient(135deg, #f59e0b, #ef4444);
+            --gradient-hero: linear-gradient(135deg, #0a0e1a 0%, #1a1040 50%, #0a0e1a 100%);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.7;
+            overflow-x: hidden;
+        }
+
+        /* Animated background */
+        .bg-grid {
+            position: fixed;
+            inset: 0;
+            background-image:
+                radial-gradient(circle at 25% 25%, rgba(59,130,246,0.04) 0%, transparent 50%),
+                radial-gradient(circle at 75% 75%, rgba(139,92,246,0.04) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .bg-grid::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image: 
+                linear-gradient(rgba(59,130,246,0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(59,130,246,0.03) 1px, transparent 1px);
+            background-size: 60px 60px;
+        }
+
+        /* Navigation */
+        nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            background: rgba(10,14,26,0.85);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+            transition: all 0.3s ease;
+        }
+
+        nav.scrolled {
+            box-shadow: 0 4px 30px rgba(0,0,0,0.3);
+        }
+
+        .nav-inner {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 64px;
+        }
+
+        .nav-logo {
+            font-weight: 800;
+            font-size: 1.1rem;
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .nav-logo svg {
+            width: 24px;
+            height: 24px;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 0.25rem;
+            list-style: none;
+        }
+
+        .nav-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.85rem;
+            font-weight: 500;
+            padding: 0.5rem 0.85rem;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .nav-links a:hover {
+            color: var(--text-primary);
+            background: rgba(59,130,246,0.1);
+        }
+
+        /* Hero */
+        .hero {
+            position: relative;
+            padding: 10rem 2rem 5rem;
+            text-align: center;
+            background: var(--gradient-hero);
+            overflow: hidden;
+        }
+
+        .hero::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 120px;
+            background: linear-gradient(to top, var(--bg-primary), transparent);
+        }
+
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.4rem 1rem;
+            background: rgba(59,130,246,0.1);
+            border: 1px solid rgba(59,130,246,0.3);
+            border-radius: 50px;
+            font-size: 0.8rem;
+            color: var(--accent-blue);
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            animation: fadeInUp 0.6s ease;
+        }
+
+        .hero h1 {
+            font-size: clamp(2.2rem, 5vw, 3.8rem);
+            font-weight: 900;
+            line-height: 1.15;
+            margin-bottom: 1.2rem;
+            animation: fadeInUp 0.6s ease 0.1s both;
+        }
+
+        .hero h1 .gradient-text {
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero-desc {
+            font-size: 1.15rem;
+            color: var(--text-secondary);
+            max-width: 680px;
+            margin: 0 auto 2.5rem;
+            animation: fadeInUp 0.6s ease 0.2s both;
+        }
+
+        .hero-stats {
+            display: flex;
+            justify-content: center;
+            gap: 3rem;
+            animation: fadeInUp 0.6s ease 0.3s both;
+        }
+
+        .hero-stat {
+            text-align: center;
+        }
+
+        .hero-stat-value {
+            font-size: 2rem;
+            font-weight: 800;
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero-stat-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-weight: 600;
+        }
+
+        /* Sections */
+        .section {
+            position: relative;
+            z-index: 1;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 5rem 2rem;
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 3.5rem;
+        }
+
+        .section-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.78rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--accent-blue);
+            margin-bottom: 0.75rem;
+        }
+
+        .section-title {
+            font-size: clamp(1.6rem, 3vw, 2.4rem);
+            font-weight: 800;
+            margin-bottom: 0.8rem;
+        }
+
+        .section-desc {
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin: 0 auto;
+            font-size: 1.05rem;
+        }
+
+        /* Cards */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 2rem;
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            border-color: rgba(59,130,246,0.3);
+            box-shadow: 0 8px 40px rgba(59,130,246,0.08);
+            transform: translateY(-2px);
+        }
+
+        /* Architecture Diagram */
+        .diagram-wrapper {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 2.5rem;
+            overflow-x: auto;
+        }
+
+        .diagram-wrapper .mermaid {
+            display: flex;
+            justify-content: center;
+        }
+
+        /* Modules Grid */
+        .modules-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .module-card {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .module-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            border-radius: 16px 16px 0 0;
+        }
+
+        .module-card:nth-child(1)::before { background: var(--gradient-1); }
+        .module-card:nth-child(2)::before { background: var(--gradient-2); }
+        .module-card:nth-child(3)::before { background: var(--gradient-3); }
+
+        .module-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .module-card:nth-child(1) .module-icon { background: rgba(59,130,246,0.15); }
+        .module-card:nth-child(2) .module-icon { background: rgba(16,185,129,0.15); }
+        .module-card:nth-child(3) .module-icon { background: rgba(245,158,11,0.15); }
+
+        .module-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            margin-bottom: 0.75rem;
+        }
+
+        .module-flow {
+            list-style: none;
+            position: relative;
+            padding-left: 1.5rem;
+        }
+
+        .module-flow li {
+            position: relative;
+            padding: 0.5rem 0;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .module-flow li::before {
+            content: '';
+            position: absolute;
+            left: -1.5rem;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--accent-blue);
+        }
+
+        .module-flow li::after {
+            content: '';
+            position: absolute;
+            left: calc(-1.5rem + 3px);
+            top: calc(50% + 8px);
+            width: 2px;
+            height: calc(100% - 8px);
+            background: var(--border);
+        }
+
+        .module-flow li:last-child::after { display: none; }
+
+        /* Combo section */
+        .combos-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .combo-card {
+            position: relative;
+        }
+
+        .combo-badge {
+            position: absolute;
+            top: 1.25rem;
+            right: 1.25rem;
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 0.25rem 0.7rem;
+            border-radius: 50px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .combo-card:nth-child(1) .combo-badge {
+            background: rgba(59,130,246,0.15);
+            color: var(--accent-blue);
+        }
+        .combo-card:nth-child(2) .combo-badge {
+            background: rgba(139,92,246,0.15);
+            color: var(--accent-purple);
+        }
+        .combo-card:nth-child(3) .combo-badge {
+            background: rgba(16,185,129,0.15);
+            color: var(--accent-green);
+        }
+
+        .combo-num {
+            font-size: 3rem;
+            font-weight: 900;
+            line-height: 1;
+            margin-bottom: 0.75rem;
+            opacity: 0.15;
+        }
+
+        .combo-card:nth-child(1) .combo-num { color: var(--accent-blue); }
+        .combo-card:nth-child(2) .combo-num { color: var(--accent-purple); }
+        .combo-card:nth-child(3) .combo-num { color: var(--accent-green); }
+
+        .combo-title {
+            font-size: 1.15rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+        }
+
+        .combo-channels {
+            display: flex;
+            flex-direction: column;
+            gap: 0.6rem;
+            margin-bottom: 1rem;
+        }
+
+        .combo-channel {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            padding: 0.6rem 0.8rem;
+            background: rgba(255,255,255,0.03);
+            border-radius: 8px;
+            font-size: 0.88rem;
+        }
+
+        .combo-channel-icon {
+            font-size: 1.2rem;
+            min-width: 24px;
+            text-align: center;
+        }
+
+        .combo-channel-text {
+            color: var(--text-secondary);
+        }
+
+        .combo-channel-text strong {
+            color: var(--text-primary);
+        }
+
+        .combo-fit {
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            padding: 0.6rem 0.8rem;
+            background: rgba(255,255,255,0.02);
+            border-radius: 8px;
+            border-left: 3px solid var(--border);
+        }
+
+        .combo-card:nth-child(1) .combo-fit { border-left-color: var(--accent-blue); }
+        .combo-card:nth-child(2) .combo-fit { border-left-color: var(--accent-purple); }
+        .combo-card:nth-child(3) .combo-fit { border-left-color: var(--accent-green); }
+
+        /* Comparison Table */
+        .table-wrapper {
+            overflow-x: auto;
+            border-radius: 16px;
+            border: 1px solid var(--border);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        thead {
+            background: var(--bg-card);
+        }
+
+        th {
+            padding: 1rem 1.25rem;
+            text-align: left;
+            font-weight: 700;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border);
+        }
+
+        td {
+            padding: 0.85rem 1.25rem;
+            border-bottom: 1px solid rgba(42,54,84,0.5);
+            color: var(--text-secondary);
+        }
+
+        tr:last-child td { border-bottom: none; }
+
+        tr:hover td {
+            background: rgba(59,130,246,0.03);
+        }
+
+        td:first-child {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .status-good { color: var(--accent-green); font-weight: 600; }
+        .status-warn { color: var(--accent-orange); font-weight: 600; }
+
+        /* Code / Schema */
+        .code-block {
+            background: #0d1117;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .code-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.25rem;
+            background: rgba(255,255,255,0.03);
+            border-bottom: 1px solid var(--border);
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        .code-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .code-dot:nth-child(1) { background: #ff5f57; }
+        .code-dot:nth-child(2) { background: #febc2e; }
+        .code-dot:nth-child(3) { background: #28c840; }
+
+        .code-content {
+            padding: 1.5rem;
+            overflow-x: auto;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.82rem;
+            line-height: 1.8;
+            color: #c9d1d9;
+        }
+
+        .code-content .kw { color: #ff7b72; }
+        .code-content .type { color: #79c0ff; }
+        .code-content .str { color: #a5d6ff; }
+        .code-content .cm { color: #8b949e; }
+        .code-content .fn { color: #d2a8ff; }
+        .code-content .val { color: #7ee787; }
+
+        /* Tech Stack */
+        .tech-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 1rem;
+        }
+
+        .tech-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1.25rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .tech-item:hover {
+            border-color: rgba(59,130,246,0.3);
+            transform: translateY(-1px);
+        }
+
+        .tech-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
+            flex-shrink: 0;
+        }
+
+        .tech-name {
+            font-weight: 700;
+            font-size: 0.9rem;
+            margin-bottom: 0.15rem;
+        }
+
+        .tech-role {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+        }
+
+        /* Daily Flow */
+        .flow-timeline {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .flow-item {
+            display: flex;
+            gap: 1.5rem;
+            align-items: flex-start;
+        }
+
+        .flow-time {
+            min-width: 100px;
+            padding: 0.5rem 1rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 0.82rem;
+            text-align: center;
+            color: var(--accent-cyan);
+            flex-shrink: 0;
+        }
+
+        .flow-content {
+            flex: 1;
+            padding: 1.25rem 1.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+        }
+
+        .flow-content h4 {
+            font-size: 1rem;
+            font-weight: 700;
+            margin-bottom: 0.6rem;
+        }
+
+        .flow-content ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .flow-content li {
+            padding: 0.3rem 0;
+            color: var(--text-secondary);
+            font-size: 0.88rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .flow-content li::before {
+            content: '→';
+            color: var(--accent-blue);
+            font-weight: 700;
+        }
+
+        /* Footer */
+        footer {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            padding: 3rem 2rem;
+            border-top: 1px solid var(--border);
+            color: var(--text-muted);
+            font-size: 0.82rem;
+        }
+
+        footer a {
+            color: var(--accent-blue);
+            text-decoration: none;
+        }
+
+        /* Animations */
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(24px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .animate-on-scroll {
+            opacity: 0;
+            transform: translateY(24px);
+            transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .animate-on-scroll.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .nav-links { display: none; }
+            .hero { padding: 8rem 1.25rem 3rem; }
+            .hero-stats { gap: 1.5rem; flex-wrap: wrap; }
+            .section { padding: 3rem 1.25rem; }
+            .modules-grid { grid-template-columns: 1fr; }
+            .combos-grid { grid-template-columns: 1fr; }
+            .tech-grid { grid-template-columns: 1fr; }
+            .flow-item { flex-direction: column; gap: 0.75rem; }
+            .flow-time { min-width: auto; }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-grid"></div>
+
+    <!-- Navigation -->
+    <nav id="navbar">
+        <div class="nav-inner">
+            <div class="nav-logo">
+                <svg viewBox="0 0 24 24" fill="none" stroke="url(#grad)" stroke-width="2">
+                    <defs><linearGradient id="grad" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#3b82f6"/><stop offset="1" stop-color="#8b5cf6"/></linearGradient></defs>
+                    <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+                </svg>
+                AI Architecture
+            </div>
+            <ul class="nav-links">
+                <li><a href="#overview">Tổng quan</a></li>
+                <li><a href="#architecture">Kiến trúc</a></li>
+                <li><a href="#combos">Output</a></li>
+                <li><a href="#modules">Modules</a></li>
+                <li><a href="#schema">Database</a></li>
+                <li><a href="#techstack">Tech Stack</a></li>
+                <li><a href="#daily">Vận hành</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <header class="hero">
+        <div class="hero-badge">🤖 Powered by Google Antigravity</div>
+        <h1>
+            Kiến Trúc <span class="gradient-text">Trợ Lý AI</span><br>
+            Giải pháp Python Parse Excel/Word
+        </h1>
+        <p class="hero-desc">
+            Xây dựng trợ lý AI xử lý 3 nhu cầu nghiệp vụ: tổng hợp báo cáo từ file Excel/Word,
+            lên lịch & nhắc nhở tự động, cảnh báo KPI & đề xuất giải pháp.
+        </p>
+        <div class="hero-stats">
+            <div class="hero-stat">
+                <div class="hero-stat-value">3</div>
+                <div class="hero-stat-label">Modules</div>
+            </div>
+            <div class="hero-stat">
+                <div class="hero-stat-value">4</div>
+                <div class="hero-stat-label">Layers</div>
+            </div>
+            <div class="hero-stat">
+                <div class="hero-stat-value">3</div>
+                <div class="hero-stat-label">Output Combos</div>
+            </div>
+            <div class="hero-stat">
+                <div class="hero-stat-value">5</div>
+                <div class="hero-stat-label">DB Tables</div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Architecture Diagram -->
+    <section class="section" id="architecture">
+        <div class="section-header animate-on-scroll">
+            <div class="section-label">📐 SYSTEM DESIGN</div>
+            <h2 class="section-title">Kiến trúc tổng thể</h2>
+            <p class="section-desc">4 layer xử lý từ input file đến output đa kênh</p>
+        </div>
+        <div class="diagram-wrapper animate-on-scroll">
+            <pre class="mermaid">
+flowchart TB
+    subgraph INPUT["📥 INPUT — Nguồn dữ liệu"]
+        EXCEL["📊 File Excel (.xlsx)\nBáo cáo phòng ban"]
+        WORD["📝 File Word (.docx)\nBáo cáo nội dung"]
+        CSV["📄 File CSV\nDữ liệu xuất hệ thống"]
+    end
+
+    subgraph PARSER["⚙️ LAYER 1 — Python Parser"]
+        PY_EXCEL["openpyxl / pandas\nĐọc & chuẩn hóa Excel"]
+        PY_WORD["python-docx\nĐọc & trích xuất Word"]
+        PY_CSV["pandas\nĐọc CSV"]
+        NORMALIZE["🔄 Data Normalizer\nChuẩn hóa format chung"]
+    end
+
+    subgraph DB["💾 LAYER 2 — Lưu trữ"]
+        SUPABASE["Supabase PostgreSQL\n- parsed_reports\n- schedules\n- kpi_thresholds\n- alerts_log"]
+        STORAGE["Supabase Storage\nLưu file gốc"]
+    end
+
+    subgraph AI["🧠 LAYER 3 — AI Engine"]
+        AGG["📊 Module 1\nTổng hợp báo cáo"]
+        SCHED["📅 Module 2\nQuản lý lịch"]
+        KPI["🚨 Module 3\nCảnh báo KPI"]
+    end
+
+    subgraph CRON["⏰ LAYER 4 — Automation"]
+        EDGE["Supabase Edge Function\nCron: chạy hàng ngày"]
+    end
+
+    subgraph OUTPUT["📤 OUTPUT — Kênh giao tiếp"]
+        TG["🤖 Telegram Bot"]
+        EMAIL["📧 Email Gmail"]
+        WEBDASH["🌐 Web Dashboard"]
+        GSHEET["📊 Google Sheets"]
+    end
+
+    EXCEL --> PY_EXCEL
+    WORD --> PY_WORD
+    CSV --> PY_CSV
+    PY_EXCEL --> NORMALIZE
+    PY_WORD --> NORMALIZE
+    PY_CSV --> NORMALIZE
+    NORMALIZE --> SUPABASE
+    EXCEL --> STORAGE
+    WORD --> STORAGE
+
+    SUPABASE --> AGG
+    SUPABASE --> SCHED
+    SUPABASE --> KPI
+
+    AGG --> TG
+    AGG --> EMAIL
+    AGG --> WEBDASH
+    AGG --> GSHEET
+    SCHED --> TG
+    KPI --> TG
+    KPI --> WEBDASH
+    KPI --> GSHEET
+
+    CRON -.->|"Trigger hàng ngày"| SCHED
+    CRON -.->|"Trigger hàng ngày"| KPI
+            </pre>
+        </div>
+    </section>
+
+    <!-- Output Combos -->
+    <section class="section" id="combos">
+        <div class="section-header animate-on-scroll">
+            <div class="section-label">📤 OUTPUT CHANNELS</div>
+            <h2 class="section-title">3 Combo kênh giao tiếp</h2>
+            <p class="section-desc">Chọn combo phù hợp với nhu cầu và quy mô doanh nghiệp</p>
+        </div>
+
+        <!-- Comparison Table -->
+        <div class="table-wrapper animate-on-scroll" style="margin-bottom: 2.5rem;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Kênh</th>
+                        <th>Khả thi</th>
+                        <th>Ưu điểm</th>
+                        <th>Nhược điểm</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>🤖 Telegram Bot</td>
+                        <td><span class="status-good">✅ Rất tốt</span></td>
+                        <td>API miễn phí, dễ setup, real-time</td>
+                        <td>Không có doc/dashboard native</td>
+                    </tr>
+                    <tr>
+                        <td>📧 Email (Gmail)</td>
+                        <td><span class="status-good">✅ Tốt</span></td>
+                        <td>Ai cũng có, phù hợp báo cáo dài</td>
+                        <td>Không real-time</td>
+                    </tr>
+                    <tr>
+                        <td>🌐 Web Dashboard</td>
+                        <td><span class="status-good">✅ Tốt</span></td>
+                        <td>Trực quan, tùy biến cao</td>
+                        <td>Cần build & host riêng</td>
+                    </tr>
+                    <tr>
+                        <td>📊 Google Sheets</td>
+                        <td><span class="status-good">✅ Tốt</span></td>
+                        <td>Ai cũng xem được, quen thuộc</td>
+                        <td>Không có alert real-time</td>
+                    </tr>
+                    <tr>
+                        <td>💬 Zalo OA</td>
+                        <td><span class="status-warn">⚠️ Có điều kiện</span></td>
+                        <td>Phổ biến nhất VN</td>
+                        <td>API hạn chế, cần duyệt OA</td>
+                    </tr>
+                    <tr>
+                        <td>💼 Slack</td>
+                        <td><span class="status-good">✅ Tốt</span></td>
+                        <td>Rich API</td>
+                        <td>Ít dùng ở DN VN nhỏ</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Combo Cards -->
+        <div class="combos-grid">
+            <div class="card combo-card animate-on-scroll">
+                <span class="combo-badge">Setup nhanh</span>
+                <div class="combo-num">01</div>
+                <h3 class="combo-title">Telegram Bot + Email</h3>
+                <div class="combo-channels">
+                    <div class="combo-channel">
+                        <span class="combo-channel-icon">🤖</span>
+                        <span class="combo-channel-text"><strong>Telegram Bot</strong> — Nhắc nhở + Cảnh báo KPI real-time</span>
+                    </div>
+                    <div class="combo-channel">
+                        <span class="combo-channel-icon">📧</span>
+                        <span class="combo-channel-text"><strong>Email (Gmail)</strong> — Báo cáo tổng định kỳ hàng tuần/tháng</span>
+                    </div>
+                </div>
+                <div class="combo-fit">💡 Phù hợp: Team quen Telegram, muốn triển khai nhanh, chi phí thấp.</div>
+            </div>
+            <div class="card combo-card animate-on-scroll">
+                <span class="combo-badge">Chuyên nghiệp</span>
+                <div class="combo-num">02</div>
+                <h3 class="combo-title">Telegram Bot + Web Dashboard</h3>
+                <div class="combo-channels">
+                    <div class="combo-channel">
+                        <span class="combo-channel-icon">🤖</span>
+                        <span class="combo-channel-text"><strong>Telegram Bot</strong> — Nhắc nhở + Cảnh báo real-time</span>
+                    </div>
+                    <div class="combo-channel">
+                        <span class="combo-channel-icon">🌐</span>
+                        <span class="combo-channel-text"><strong>Web Dashboard</strong> — KPI trực quan, biểu đồ, báo cáo online</span>
+                    </div>
+                </div>
+                <div class="combo-fit">💡 Phù hợp: Muốn hình ảnh chuyên nghiệp, dashboard riêng cho ban lãnh đạo.</div>
+            </div>
+            <div class="card combo-card animate-on-scroll">
+                <span class="combo-badge">Đơn giản</span>
+                <div class="combo-num">03</div>
+                <h3 class="combo-title">Telegram Bot + Google Sheets</h3>
+                <div class="combo-channels">
+                    <div class="combo-channel">
+                        <span class="combo-channel-icon">🤖</span>
+                        <span class="combo-channel-text"><strong>Telegram Bot</strong> — Nhắc nhở + Cảnh báo real-time</span>
+                    </div>
+                    <div class="combo-channel">
+                        <span class="combo-channel-icon">📊</span>
+                        <span class="combo-channel-text"><strong>Google Sheets</strong> — Lưu & hiển thị data KPI chia sẻ team</span>
+                    </div>
+                </div>
+                <div class="combo-fit">💡 Phù hợp: Team đã dùng Google Workspace, không muốn học tool mới.</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Modules -->
+    <section class="section" id="modules">
+        <div class="section-header animate-on-scroll">
+            <div class="section-label">🧩 CORE MODULES</div>
+            <h2 class="section-title">Chi tiết từng Module</h2>
+            <p class="section-desc">3 module nghiệp vụ hoạt động độc lập và bổ trợ lẫn nhau</p>
+        </div>
+        <div class="modules-grid">
+            <!-- Module 1 -->
+            <div class="card module-card animate-on-scroll">
+                <div class="module-icon">📊</div>
+                <h3 class="module-title">Module 1: Tổng hợp báo cáo</h3>
+                <ul class="module-flow">
+                    <li>Nhận file Excel/Word từ phòng ban</li>
+                    <li>Python parse: <code>pandas.read_excel()</code> → DataFrame</li>
+                    <li>Word: <code>python-docx</code> → Text + Tables</li>
+                    <li>Chuẩn hóa & lưu vào Supabase</li>
+                    <li>AI phân tích, so sánh chéo giữa phòng ban</li>
+                    <li>Xuất báo cáo tổng → Telegram / Email / Dashboard</li>
+                </ul>
+            </div>
+            <!-- Module 2 -->
+            <div class="card module-card animate-on-scroll">
+                <div class="module-icon">📅</div>
+                <h3 class="module-title">Module 2: Lên lịch & Nhắc nhở</h3>
+                <ul class="module-flow">
+                    <li>User yêu cầu AI lên lịch</li>
+                    <li>Lưu vào bảng <code>schedules</code> trên Supabase</li>
+                    <li>Edge Function chạy Cron mỗi sáng 7:00</li>
+                    <li>Query lịch hôm nay chưa nhắc</li>
+                    <li>Gửi nhắc nhở qua Telegram Bot</li>
+                    <li>Update <code>reminder_sent = true</code></li>
+                </ul>
+            </div>
+            <!-- Module 3 -->
+            <div class="card module-card animate-on-scroll">
+                <div class="module-icon">🚨</div>
+                <h3 class="module-title">Module 3: Cảnh báo KPI</h3>
+                <ul class="module-flow">
+                    <li>Data KPI parse từ Excel → Supabase</li>
+                    <li>So sánh <code>kpi_data</code> vs <code>kpi_thresholds</code></li>
+                    <li>Nếu giá trị dưới ngưỡng cảnh báo → Trigger alert</li>
+                    <li>AI phân tích nguyên nhân + Perplexity research</li>
+                    <li>Đề xuất action items cụ thể</li>
+                    <li>Gửi cảnh báo chi tiết qua Telegram Bot</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- Database Schema -->
+    <section class="section" id="schema">
+        <div class="section-header animate-on-scroll">
+            <div class="section-label">💾 DATABASE</div>
+            <h2 class="section-title">Database Schema</h2>
+            <p class="section-desc">Supabase PostgreSQL — 5 bảng chính</p>
+        </div>
+        <div class="code-block animate-on-scroll">
+            <div class="code-header">
+                <span class="code-dot"></span>
+                <span class="code-dot"></span>
+                <span class="code-dot"></span>
+                <span style="margin-left: auto;">schema.sql</span>
+            </div>
+            <div class="code-content"><span class="cm">-- Bảng lưu báo cáo đã parse</span>
+<span class="kw">CREATE TABLE</span> <span class="fn">parsed_reports</span> (
+    id <span class="type">UUID</span> <span class="kw">PRIMARY KEY DEFAULT</span> <span class="fn">gen_random_uuid</span>(),
+    phong_ban <span class="type">TEXT</span> <span class="kw">NOT NULL</span>,          <span class="cm">-- 'kinh_doanh', 'marketing', 'van_hanh'</span>
+    thang <span class="type">INTEGER</span> <span class="kw">NOT NULL</span>,
+    nam <span class="type">INTEGER</span> <span class="kw">NOT NULL</span>,
+    loai_bao_cao <span class="type">TEXT</span> <span class="kw">NOT NULL</span>,       <span class="cm">-- 'excel', 'word'</span>
+    data_json <span class="type">JSONB</span>,                  <span class="cm">-- Dữ liệu đã chuẩn hóa</span>
+    raw_text <span class="type">TEXT</span>,                    <span class="cm">-- Nội dung text thô (từ Word)</span>
+    file_path <span class="type">TEXT</span>,
+    created_at <span class="type">TIMESTAMPTZ</span> <span class="kw">DEFAULT</span> <span class="fn">NOW</span>()
+);
+
+<span class="cm">-- Bảng lịch làm việc</span>
+<span class="kw">CREATE TABLE</span> <span class="fn">schedules</span> (
+    id <span class="type">UUID</span> <span class="kw">PRIMARY KEY DEFAULT</span> <span class="fn">gen_random_uuid</span>(),
+    title <span class="type">TEXT</span> <span class="kw">NOT NULL</span>,
+    description <span class="type">TEXT</span>,
+    scheduled_date <span class="type">DATE</span> <span class="kw">NOT NULL</span>,
+    scheduled_time <span class="type">TIME</span>,
+    priority <span class="type">TEXT</span> <span class="kw">DEFAULT</span> <span class="str">'medium'</span>,   <span class="cm">-- 'high', 'medium', 'low'</span>
+    assignee_lark_id <span class="type">TEXT</span>,
+    status <span class="type">TEXT</span> <span class="kw">DEFAULT</span> <span class="str">'pending'</span>,
+    reminder_sent <span class="type">BOOLEAN</span> <span class="kw">DEFAULT</span> <span class="val">FALSE</span>,
+    created_at <span class="type">TIMESTAMPTZ</span> <span class="kw">DEFAULT</span> <span class="fn">NOW</span>()
+);
+
+<span class="cm">-- Bảng dữ liệu KPI</span>
+<span class="kw">CREATE TABLE</span> <span class="fn">kpi_data</span> (
+    id <span class="type">UUID</span> <span class="kw">PRIMARY KEY DEFAULT</span> <span class="fn">gen_random_uuid</span>(),
+    phong_ban <span class="type">TEXT</span> <span class="kw">NOT NULL</span>,
+    chi_so <span class="type">TEXT</span> <span class="kw">NOT NULL</span>,             <span class="cm">-- 'doanh_thu', 'ty_le_chuyen_doi'...</span>
+    gia_tri <span class="type">NUMERIC</span> <span class="kw">NOT NULL</span>,
+    don_vi <span class="type">TEXT</span>,                      <span class="cm">-- '%', 'VND', 'đơn'</span>
+    thang <span class="type">INTEGER</span> <span class="kw">NOT NULL</span>,
+    nam <span class="type">INTEGER</span> <span class="kw">NOT NULL</span>,
+    created_at <span class="type">TIMESTAMPTZ</span> <span class="kw">DEFAULT</span> <span class="fn">NOW</span>()
+);
+
+<span class="cm">-- Bảng ngưỡng KPI</span>
+<span class="kw">CREATE TABLE</span> <span class="fn">kpi_thresholds</span> (
+    id <span class="type">UUID</span> <span class="kw">PRIMARY KEY DEFAULT</span> <span class="fn">gen_random_uuid</span>(),
+    chi_so <span class="type">TEXT</span> <span class="kw">NOT NULL UNIQUE</span>,
+    nguong_tot <span class="type">NUMERIC</span> <span class="kw">NOT NULL</span>,
+    nguong_canh_bao <span class="type">NUMERIC</span> <span class="kw">NOT NULL</span>,
+    don_vi <span class="type">TEXT</span>,
+    updated_at <span class="type">TIMESTAMPTZ</span> <span class="kw">DEFAULT</span> <span class="fn">NOW</span>()
+);
+
+<span class="cm">-- Bảng log cảnh báo</span>
+<span class="kw">CREATE TABLE</span> <span class="fn">alerts_log</span> (
+    id <span class="type">UUID</span> <span class="kw">PRIMARY KEY DEFAULT</span> <span class="fn">gen_random_uuid</span>(),
+    loai <span class="type">TEXT</span> <span class="kw">NOT NULL</span>,               <span class="cm">-- 'kpi_warning', 'schedule_reminder'</span>
+    noi_dung <span class="type">TEXT</span> <span class="kw">NOT NULL</span>,
+    phong_ban <span class="type">TEXT</span>,
+    da_gui <span class="type">BOOLEAN</span> <span class="kw">DEFAULT</span> <span class="val">FALSE</span>,
+    created_at <span class="type">TIMESTAMPTZ</span> <span class="kw">DEFAULT</span> <span class="fn">NOW</span>()
+);</div>
+        </div>
+    </section>
+
+    <!-- Tech Stack -->
+    <section class="section" id="techstack">
+        <div class="section-header animate-on-scroll">
+            <div class="section-label">🛠️ TECHNOLOGY</div>
+            <h2 class="section-title">Tech Stack tổng hợp</h2>
+            <p class="section-desc">Công nghệ sử dụng cho từng layer</p>
+        </div>
+        <div class="tech-grid">
+            <div class="tech-item animate-on-scroll">
+                <div class="tech-icon" style="background:rgba(59,130,246,0.12)">🐍</div>
+                <div>
+                    <div class="tech-name">Python + pandas + openpyxl</div>
+                    <div class="tech-role">File Parser — Parse Excel/Word</div>
+                </div>
+            </div>
+            <div class="tech-item animate-on-scroll">
+                <div class="tech-icon" style="background:rgba(16,185,129,0.12)">🗄️</div>
+                <div>
+                    <div class="tech-name">Supabase PostgreSQL</div>
+                    <div class="tech-role">Database — Lưu trữ data, lịch, KPI</div>
+                </div>
+            </div>
+            <div class="tech-item animate-on-scroll">
+                <div class="tech-icon" style="background:rgba(139,92,246,0.12)">📦</div>
+                <div>
+                    <div class="tech-name">Supabase Storage</div>
+                    <div class="tech-role">File Storage — Lưu file gốc</div>
+                </div>
+            </div>
+            <div class="tech-item animate-on-scroll">
+                <div class="tech-icon" style="background:rgba(236,72,153,0.12)">🧠</div>
+                <div>
+                    <div class="tech-name">Google Antigravity</div>
+                    <div class="tech-role">AI Engine — Phân tích, tổng hợp</div>
+                </div>
+            </div>
+            <div class="tech-item animate-on-scroll">
+                <div class="tech-icon" style="background:rgba(6,182,212,0.12)">🔍</div>
+                <div>
+                    <div class="tech-name">Perplexity API</div>
+                    <div class="tech-role">Research — Tìm giải pháp</div>
+                </div>
+            </div>
+            <div class="tech-item animate-on-scroll">
+                <div class="tech-icon" style="background:rgba(245,158,11,0.12)">⏰</div>
+                <div>
+                    <div class="tech-name">Edge Function + Cron</div>
+                    <div class="tech-role">Automation — Nhắc nhở tự động</div>
+                </div>
+            </div>
+            <div class="tech-item animate-on-scroll">
+                <div class="tech-icon" style="background:rgba(59,130,246,0.12)">🤖</div>
+                <div>
+                    <div class="tech-name">Telegram Bot API</div>
+                    <div class="tech-role">Communication — Real-time alerts</div>
+                </div>
+            </div>
+            <div class="tech-item animate-on-scroll">
+                <div class="tech-icon" style="background:rgba(239,68,68,0.12)">📧</div>
+                <div>
+                    <div class="tech-name">Gmail / Sheets / Dashboard</div>
+                    <div class="tech-role">Reporting — Báo cáo theo Combo</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Daily Operations -->
+    <section class="section" id="daily">
+        <div class="section-header animate-on-scroll">
+            <div class="section-label">🔄 DAILY OPERATIONS</div>
+            <h2 class="section-title">Quy trình vận hành hàng ngày</h2>
+            <p class="section-desc">Automated workflow từ sáng đến tối</p>
+        </div>
+        <div class="flow-timeline">
+            <div class="flow-item animate-on-scroll">
+                <div class="flow-time">⏰ 7:00<br>SÁNG</div>
+                <div class="flow-content">
+                    <h4>Edge Function chạy tự động</h4>
+                    <ul>
+                        <li>Check lịch hôm nay → Gửi nhắc nhở qua Telegram</li>
+                        <li>Check KPI mới nhất → Gửi cảnh báo nếu có chỉ số dưới ngưỡng</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="flow-item animate-on-scroll">
+                <div class="flow-time">📥 KHI CÓ<br>BÁO CÁO</div>
+                <div class="flow-content">
+                    <h4>Xử lý báo cáo mới từ phòng ban</h4>
+                    <ul>
+                        <li>User gửi file Excel/Word cho Antigravity</li>
+                        <li>Python parse → lưu Supabase</li>
+                        <li>AI phân tích & tổng hợp</li>
+                        <li>Xuất báo cáo → Telegram + Email / Dashboard / Sheets</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="flow-item animate-on-scroll">
+                <div class="flow-time">💬 KHI CẦN<br>LÊN LỊCH</div>
+                <div class="flow-content">
+                    <h4>Tạo lịch mới theo yêu cầu</h4>
+                    <ul>
+                        <li>User nhắn: "Lên lịch họp với team MKT ngày 15/3"</li>
+                        <li>Antigravity tạo record trong Supabase</li>
+                        <li>Xác nhận qua Telegram: "✅ Đã lên lịch, sẽ nhắc bạn"</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <p>Kiến Trúc Trợ Lý AI — Giải pháp Python Parse Excel/Word</p>
+        <p style="margin-top: 0.5rem;">Powered by <a href="#">Google Antigravity</a> • Supabase • Telegram Bot</p>
+    </footer>
+
+    <script>
+        // Mermaid init
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'dark',
+            themeVariables: {
+                primaryColor: '#1a2234',
+                primaryBorderColor: '#3b82f6',
+                primaryTextColor: '#f1f5f9',
+                lineColor: '#64748b',
+                secondaryColor: '#1f2a40',
+                tertiaryColor: '#111827',
+                fontSize: '13px'
+            },
+            flowchart: {
+                htmlLabels: true,
+                curve: 'basis',
+                padding: 15
+            }
+        });
+
+        // Navbar scroll effect
+        window.addEventListener('scroll', () => {
+            document.getElementById('navbar').classList.toggle('scrolled', window.scrollY > 20);
+        });
+
+        // Scroll reveal animation
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach((entry, i) => {
+                if (entry.isIntersecting) {
+                    setTimeout(() => {
+                        entry.target.classList.add('visible');
+                    }, i * 80);
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+        document.querySelectorAll('.animate-on-scroll').forEach(el => observer.observe(el));
+
+        // Smooth scroll for nav links
+        document.querySelectorAll('.nav-links a').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const target = document.querySelector(link.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
+        });
+    </script>
+</body>
+</html>
